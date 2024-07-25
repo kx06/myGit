@@ -8,4 +8,4 @@ I shall update the readme as I add features :)
 
 ### To Run :
 
-$ mygit
+`$ mygit`
