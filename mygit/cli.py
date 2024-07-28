@@ -56,7 +56,7 @@ def hash_object(repo_funcs, args):
 def cat_file(repo_funcs, args):
     try:
         sys.stdout.flush()
-        sys.stdout.buffer.write(repo_funcs.get_object(args.object))
+        sys.stdout.buffer.write(repo_funcs.get_object(args.object, extected=None))
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

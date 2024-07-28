@@ -30,16 +30,22 @@ class MyGitFuncs:
         Path(self.GIT_DIR).mkdir()
         Path(PurePath(self.GIT_DIR, "objects").joinpath()).mkdir()
 
-    def hash_object(self, data):
-        oid = hashlib.sha256(data).hexdigest()
+    def hash_object(self, data, type_="blob"):
+        obj = type_.encode() + b"\x00" + data
+        oid = hashlib.sha256(obj).hexdigest()
         path = self.git_dir / "objects" / oid
         with path.open(mode="wb") as f:
-            f.write(data)
+            f.write(obj)
         return oid
 
-    def get_object(self, oid):
+    def get_object(self, oid, expected="blob"):
         path = self.git_dir / "objects" / oid
         if not path.exists():
             raise Exception(f"object {oid} not found")
         with path.open(mode="rb") as f:
-            return f.read()
+            obj = f.read()
+        type_, _, content = obj.partition(b"\x00")
+        type_ = type_.decode()
+        if expected is not None and type_ != expected:
+            raise ValueError(f"Expected{expected}, got {type_}")
+        return content
