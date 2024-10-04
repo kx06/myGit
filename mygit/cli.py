@@ -1,7 +1,12 @@
 import argparse
-import os
 import sys
+from pathlib import PurePath
+from pathlib import Path
+import textwrap
+
+from . import base
 from .data import MyGitFuncs
+from .base import MyGitHigherFuncs
 
 
 def parse_args():
@@ -10,6 +15,8 @@ def parse_args():
     )
     commands = parser.add_subparsers(dest="command")
     commands.required = True
+
+    oid = MyGitHigherFuncs.get_oid
 
     init_parser = commands.add_parser("init", help="Initialize a new repository")
     init_parser.set_defaults(func=init)
@@ -24,23 +31,47 @@ def parse_args():
         "cat-file", help="Provide content of repository object"
     )
     cat_file_parser.set_defaults(func=cat_file)
-    cat_file_parser.add_argument("object", help="The object to display")
+    cat_file_parser.add_argument("object", type=oid, help="The object to display")
+
+    write_tree_parser = commands.add_parser("write-tree")
+    write_tree_parser.set_defaults(func=write_tree)
+
+    read_tree_parser = commands.add_parser("read-tree")
+    read_tree_parser.set_defaults(func=read_tree)
+    read_tree_parser.add_argument("tree", type=oid)
+
+    commit_parser = commands.add_parser("commit")
+    commit_parser.set_defaults(func=commit)
+    commit_parser.add_argument("-m", "--message", required=True)
+
+    log_parser = commands.add_parser("log")
+    log_parser.set_defaults(func=log)
+    log_parser.add_argument("oid", default="@", type=oid, nargs="?")
+
+    checkout_parser = commands.add_parser("checkout")
+    checkout_parser.set_defaults(func=checkout)
+    checkout_parser.add_argument("oid", type=oid)
+
+    tag_parser = commands.add_parser("tag")
+    tag_parser.set_defaults(func=tag)
+    tag_parser.add_argument("name")
+    tag_parser.add_argument("oid", nargs="?", type=oid)
 
     return parser.parse_args()
 
 
-def init(repo_funcs, args):
+def init(args):
     try:
         repo_funcs.init()
         print(
-            f"Initialized an empty mygit repository in {os.path.join(os.getcwd(), repo_funcs.GIT_DIR)}"
+            f"Initialized an empty mygit repository in {Path.cwd() / repo_funcs.GIT_DIR}"
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def hash_object(repo_funcs, args):
+def hash_object(args):
     # try:
     with open(args.file, "rb") as f:
         content = f.read()
@@ -53,19 +84,53 @@ def hash_object(repo_funcs, args):
     #     sys.exit(1)
 
 
-def cat_file(repo_funcs, args):
+def cat_file(args):
     try:
         sys.stdout.flush()
-        sys.stdout.buffer.write(repo_funcs.get_object(args.object, extected=None))
+        sys.stdout.buffer.write(repo_funcs.get_object(args.object, expected=None))
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
+def write_tree(args):
+    print(hl_funcs.write_tree())
+
+
+def read_tree(args):
+    hl_funcs.read_tree(args.tree)
+
+
+def commit(args):
+    print(hl_funcs.commit(args.message))
+
+
+def log(args):
+    oid = args.oid or repo_funcs.get_ref("HEAD")
+    while oid:
+        commit = hl_funcs.get_commit(oid)
+        print(f"commit {oid}\n")
+        print(textwrap.indent(commit.message, "\t"))
+        print("")
+        oid = commit.parent
+
+
+def checkout(args):
+    hl_funcs.checkout(args.oid)
+
+
+def tag(args):
+    oid = args.oid or repo_funcs.get_ref("HEAD")
+    hl_funcs.create_tag(args.name, oid)
+
+
 def main():
+    global repo_funcs
     repo_funcs = MyGitFuncs()
+    global hl_funcs
+    hl_funcs = MyGitHigherFuncs()
     args = parse_args()
-    args.func(repo_funcs, args)
+    args.func(args)
 
 
 if __name__ == "__main__":

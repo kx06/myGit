@@ -9,37 +9,24 @@ class MyGitFuncs:
 
     def __init__(self):
         self.cwd = Path.cwd()
-        self.git_dir = self.cwd
-
-        def find_root(cwd):
-            root = PurePath(cwd).anchor
-            while cwd != root:
-                for i in Path.iterdir(cwd):
-                    if i.is_dir():
-                        if i.name == self.GIT_DIR:
-                            self.git_dir = cwd / self.GIT_DIR
-                            return True
-                    cwd = cwd.parent
-            return False
-
-        find_root(self.cwd)
 
     def init(self):
         if Path(self.GIT_DIR).exists():
             raise Exception(f"repository already exists")
-        Path(self.GIT_DIR).mkdir()
+        self.git_dir = self.cwd / self.GIT_DIR
+        Path(self.git_dir).mkdir()
         Path(PurePath(self.GIT_DIR, "objects").joinpath()).mkdir()
 
     def hash_object(self, data, type_="blob"):
         obj = type_.encode() + b"\x00" + data
-        oid = hashlib.sha256(obj).hexdigest()
-        path = self.git_dir / "objects" / oid
+        oid = hashlib.sha512(obj).hexdigest()
+        path = Path(self.GIT_DIR) / "objects" / oid
         with path.open(mode="wb") as f:
             f.write(obj)
         return oid
 
     def get_object(self, oid, expected="blob"):
-        path = self.git_dir / "objects" / oid
+        path = Path(self.GIT_DIR) / "objects" / oid
         if not path.exists():
             raise Exception(f"object {oid} not found")
         with path.open(mode="rb") as f:
@@ -49,3 +36,13 @@ class MyGitFuncs:
         if expected is not None and type_ != expected:
             raise ValueError(f"Expected{expected}, got {type_}")
         return content
+
+    def update_ref(self, ref, oid):
+        ref_path = Path(self.GIT_DIR) / ref
+        ref_path.parent.mkdir(parents=True, exist_ok=True)
+        ref_path.write_text(oid)
+
+    def get_ref(self, ref):
+        ref_path = Path(self.GIT_DIR) / ref
+        if ref_path.is_file():
+            return ref_path.read_text().strip()
